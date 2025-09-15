@@ -9,6 +9,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -33,8 +35,6 @@ jobs:
 
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
       # Re-run the build to ensure the /dist directory exists before uploading to the release.
       - name: Rebuild package for release asset
