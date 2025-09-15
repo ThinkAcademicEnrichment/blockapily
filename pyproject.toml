@@ -3,7 +3,7 @@ name = "blockapily"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "d4g33z",email = "jeff@du.local"}
+    {name = "jeff",email = "jeff@thinkae.org"}
 ]
 readme = "README.md"
 requires-python = ">=3.9"
