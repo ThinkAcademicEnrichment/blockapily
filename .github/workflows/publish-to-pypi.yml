@@ -35,6 +35,9 @@ jobs:
 
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
 
       # Re-run the build to ensure the /dist directory exists before uploading to the release.
       - name: Rebuild package for release asset
