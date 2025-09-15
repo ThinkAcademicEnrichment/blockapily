@@ -1,0 +1,14 @@
+.*
+!.github
+!.gitignore
+__pycache__
+
+coverage.xml
+htmlcov
+
+/dist/
+publish.log
+
+*.egg-info
+poetry.lock
+

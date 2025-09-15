@@ -1,0 +1,56 @@
+# .github/workflows/publish-to-pypi.yml
+
+name: Publish Package to PyPI and GitHub
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install all dependencies
+        run: |
+          poetry install --no-interaction
+
+      - name: Build Source Distribution (sdist)
+        run: poetry build --format sdist
+
+      - name: Build Wheel from sdist
+        run: pip wheel --no-deps --wheel-dir dist/ dist/*.tar.gz
+
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      # Re-run the build to ensure the /dist directory exists before uploading to the release.
+      - name: Rebuild package for release asset
+        run: poetry build
+
+# this section fails with ENOENT: no such file or directory, stat './dist/*.whl'
+#      - name: Upload wheel as a release asset
+#        uses: actions/upload-release-asset@v1
+#        with:
+#          # This is the URL provided by the 'release' event that triggered the workflow
+#          upload_url: ${{ github.event.release.upload_url }}
+#          # This specifies which file from the 'dist' directory to upload
+#          asset_path: ./dist/*.whl
+#          # This is the name the file will have in the release assets
+#          asset_name: mc_shell-${{ github.ref_name }}.whl
+#          asset_content_type: application/zip
+#        env:
+#          # The GITHUB_TOKEN is automatically provided by GitHub
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
