@@ -125,7 +125,7 @@ class BlocklyGenerator:
         # Unchanged from previous version
         value_declarations, params = [], list(sig.parameters.values())[1:]
         for param in params:
-            default_value = "None"
+            default_value = "'None'"
             if param.default is not inspect.Parameter.empty:
                 if isinstance(param.default, str): default_value = f"'{param.default}'"
                 elif isinstance(param.default, bool): default_value = str(param.default).lower()
