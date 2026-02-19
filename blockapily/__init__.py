@@ -56,7 +56,8 @@ class BlocklyGenerator:
             output_type = self._get_output_type(method)
             tooltip = inspect.getdoc(method) or ""
 
-            blocks_js.append(self._generate_js_definition(block_type, label, params, output_type, tooltip))
+            # Pass the method to extract precise parameter types
+            blocks_js.append(self._generate_js_definition(block_type, label, params, output_type, tooltip, method))
             generators_py.append(self._generate_python_generator(block_type, name, params))
             xml_blocks.append(self._generate_xml_block(block_type, params))
 
@@ -64,11 +65,50 @@ class BlocklyGenerator:
 
         return "\n".join(blocks_js), "\n".join(generators_py), category_xml
 
-    def _generate_js_definition(self, block_type, label, params, output_type, tooltip):
+    def _resolve_js_check_type(self, param_type) -> Optional[str]:
+        """Helper to resolve Python type hints into JS array or string strings for .setCheck()"""
+        param_str = str(param_type)
+
+        # Handle Union[TypeA, TypeB] -> "['MappedA', 'MappedB']"
+        if 'Union' in param_str:
+            try:
+                inner = param_str.split('[')[1].split(']')[0]
+                types = []
+                for t in inner.split(','):
+                    t_clean = t.strip().strip("'\"")
+                    if '<class' in t_clean:
+                        t_clean = t_clean.split("'")[1]
+                    types.append(t_clean)
+                mapped_types = [self.type_map.get(t, t) for t in types]
+                return "[" + ", ".join(f"'{mt}'" for mt in mapped_types) + "]"
+            except Exception:
+                pass
+
+        # Handle single types
+        type_name = getattr(param_type, '__name__', param_str).strip("'\"")
+        if '<class' in type_name:
+            type_name = type_name.split("'")[1]
+
+        mapped = self.type_map.get(type_name, type_name)
+        return f"'{mapped}'" if mapped else None
+
+    def _generate_js_definition(self, block_type, label, params, output_type, tooltip, method):
         args_js_list = []
+        sig = inspect.signature(method)
+
         for param_name, meta in params.items():
             arg_label = meta.get('label', param_name.title())
-            args_js_list.append(f"this.appendValueInput('{param_name}').appendField('{arg_label}');")
+            input_js = f"this.appendValueInput('{param_name}').appendField('{arg_label}')"
+
+            # Extract and map the type hint from the method signature
+            if param_name in sig.parameters:
+                param_type = sig.parameters[param_name].annotation
+                if param_type != inspect.Signature.empty:
+                    check_str = self._resolve_js_check_type(param_type)
+                    if check_str:
+                        input_js += f".setCheck({check_str})"
+
+            args_js_list.append(input_js + ";")
 
         newline = '\n'
         args_js_str = newline.join(args_js_list)
@@ -111,11 +151,6 @@ class BlocklyGenerator:
                 values_xml.append(f'<value name="{p_name}">{full_shadow}</value>')
 
         return f'<block type="{block_type}">{" ".join(values_xml)}</block>'
-
-    @staticmethod
-    def _get_clean_tag(element: ET.Element) -> str:
-        """Helper to get tag name without namespace for comparison."""
-        return element.tag.split('}')[-1]
 
     @staticmethod
     def generate_picker(block_type: str, label: str, options: List[Tuple[str, str]],
@@ -179,6 +214,14 @@ class BlocklyGenerator:
         return {"js": js_def, "py": py_gen, "xml": xml}
 
     @staticmethod
+    def _strip_ns_prefix(root: ET.Element):
+        """Recursively removes namespace prefixes from elements for clean Blockly XML."""
+        for elem in root.iter():
+            if '}' in elem.tag:
+                elem.tag = elem.tag.split('}', 1)[1]
+        return root
+
+    @staticmethod
     def update_toolbox(category_xml: str, toolbox_path: Path):
         """Standard append-or-replace category update logic, handling namespaces correctly."""
         if not toolbox_path.exists(): return
@@ -186,25 +229,21 @@ class BlocklyGenerator:
         tree = ET.parse(toolbox_path)
         root = tree.getroot()
 
-        # Ensure snippet is parsed in the correct namespace
-        new_cat = ET.fromstring(f'<xml xmlns="{BLOCKLY_NS}">{category_xml}</xml>')[0]
+        temp_xml = ET.fromstring(f'<xml xmlns="{BLOCKLY_NS}">{category_xml}</xml>')
+        new_cat = temp_xml[0]
         new_name = new_cat.get('name')
 
-        # Find and remove existing category with same name (namespace agnostic)
-        to_remove = []
-        for cat in root.findall('.//{*}category'):
-            if cat.get('name') == new_name:
-                to_remove.append(cat)
-
+        to_remove = [cat for cat in root.findall('.//{*}category') if cat.get('name') == new_name]
         for cat in to_remove:
-            # Finding the parent in ElementTree to perform removal
-            for parent in root.findall('.//*'):
+            for parent in root.iter():
                 if cat in parent:
                     parent.remove(cat)
-                elif cat in root:
-                    root.remove(cat)
+                    break
 
         root.append(new_cat)
+        root.tag = "xml"
+        cleaned_root = BlocklyGenerator._strip_ns_prefix(root)
+
         tree.write(toolbox_path, encoding='utf-8', xml_declaration=True)
 
     @staticmethod
@@ -215,16 +254,13 @@ class BlocklyGenerator:
         tree = ET.parse(toolbox_path)
         root = tree.getroot()
 
-        # Find target category (namespace agnostic)
-        target_cat = None
-        for cat in root.findall('.//{*}category'):
-            if cat.get('name') == category_name:
-                target_cat = cat
-                break
+        target_cat = next((cat for cat in root.findall('.//{*}category') if cat.get('name') == category_name), None)
 
         if target_cat is not None:
-            # Parse snippet in standard namespace
             snippet = ET.fromstring(f'<xml xmlns="{BLOCKLY_NS}">{block_xml_snippet}</xml>')
             for block in snippet:
                 target_cat.append(block)
+
+            root.tag = "xml"
+            cleaned_root = BlocklyGenerator._strip_ns_prefix(root)
             tree.write(toolbox_path, encoding='utf-8', xml_declaration=True)
