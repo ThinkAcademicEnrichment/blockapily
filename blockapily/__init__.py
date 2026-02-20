@@ -151,7 +151,7 @@ class BlocklyGenerator:
         return f"""
     pythonGenerator.forBlock['{block_type}'] = function(block, generator) {{
         {arg_collectors_str}
-        const code = `.{method_name}({args_template})\\n`;
+        const code = `self.action_implementer.{method_name}({args_template})\\n`;
         return block.outputConnection ? [code.trim(), pythonGenerator.ORDER_ATOMIC] : code;
     }};"""
 
