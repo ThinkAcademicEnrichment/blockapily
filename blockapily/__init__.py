@@ -64,7 +64,7 @@ class BlocklyGenerator:
 
             blocks_js.append(self._generate_js_definition(block_type, label, params, output_type, tooltip, method))
             generators_py.append(self._generate_python_generator(block_type, name, params))
-            xml_blocks.append(self._generate_xml_block(block_type, params))
+            xml_blocks.append(self._generate_xml_block(block_type, params, method))
 
         category_xml = f'<category name="{self.cls.__name__}" colour="{self.category_colour}">\n' + "\n".join(xml_blocks) + "\n</category>"
 
@@ -82,7 +82,7 @@ class BlocklyGenerator:
                 for t in inner.split(','):
                     t_clean = t.strip().strip("'\"")
                     if '<class' in t_clean:
-                        t_clean = t_clean.split("'")[1]
+                        t_clean = t_clean.split("'")[1].split('.')[-1]
                     types.append(t_clean)
                 mapped_types = [self.type_map.get(mt, mt) for mt in types]
                 return "[" + ", ".join(f"'{mt}'" for mt in mapped_types) + "]"
@@ -92,7 +92,7 @@ class BlocklyGenerator:
         # Handle single types/classes
         type_name = getattr(param_type, '__name__', param_str).strip("'\"")
         if '<class' in type_name:
-            type_name = type_name.split("'")[1]
+            type_name = type_name.split("'")[1].split('.')[-1]
 
         mapped = self.type_map.get(type_name, type_name)
         return f"'{mapped}'" if mapped else None
@@ -102,7 +102,7 @@ class BlocklyGenerator:
         sig = inspect.signature(method)
 
         for param_name, meta in params.items():
-            # CRITICAL FIX: Only generate inputs for things actually in the method signature
+            # Only generate inputs for things actually in the method signature
             if param_name not in sig.parameters:
                 continue
 
@@ -142,13 +142,10 @@ class BlocklyGenerator:
     def _generate_python_generator(self, block_type, method_name, params):
         arg_collectors_list = []
         for p in params:
-            # Simple check to avoid generating code for non-params like 'tooltip'
-            # Note: The JS definition loop already filters these, but we do it here for symmetry
             arg_collectors_list.append(f"const {p} = generator.valueToCode(block, '{p}', pythonGenerator.ORDER_ATOMIC) || 'None';")
 
         newline = '\n'
         arg_collectors_str = newline.join(arg_collectors_list)
-        # Filter logic here would be redundant as the block itself won't have the input fields
         args_template = ", ".join([f"${{{p}}}" for p in params])
 
         return f"""
@@ -158,13 +155,43 @@ class BlocklyGenerator:
         return block.outputConnection ? [code.trim(), pythonGenerator.ORDER_ATOMIC] : code;
     }};"""
 
-    def _generate_xml_block(self, block_type, params):
+    def _generate_xml_block(self, block_type, params, method):
+        """Generates the XML configuration for a block, automatically inferring shadows from type hints."""
         values_xml = []
+        sig = inspect.signature(method)
+
         for p_name, meta in params.items():
             if not isinstance(meta, dict): continue
+
             shadow = meta.get('shadow')
+            full_shadow = None
+
+            # 1. Check for Explicit Override in decorator metadata
             if shadow:
                 full_shadow = self.shadow_map.get(shadow, shadow)
+            # 2. Check for Implicit Match via Python type hint
+            elif p_name in sig.parameters:
+                param_type = sig.parameters[p_name].annotation
+                if param_type != inspect.Signature.empty:
+
+                    type_name = getattr(param_type, '__name__', str(param_type)).strip("'\"")
+                    if '<class' in type_name:
+                        type_name = type_name.split("'")[1].split('.')[-1]
+
+                    # Handle Union by prioritizing the first type for shadows
+                    if 'Union' in type_name:
+                        try:
+                            inner = type_name.split('[')[1].split(']')[0]
+                            type_name = inner.split(',')[0].strip().strip("'\"")
+                            if '<class' in type_name:
+                                type_name = type_name.split("'")[1].split('.')[-1]
+                        except: pass
+
+                    # Resolve automatically via RegistryBuilder's SHADOW_MAP keys
+                    if type_name in self.shadow_map:
+                        full_shadow = self.shadow_map[type_name]
+
+            if full_shadow:
                 values_xml.append(f'<value name="{p_name}">{full_shadow}</value>')
 
         return f'<block type="{block_type}">{" ".join(values_xml)}</block>'
