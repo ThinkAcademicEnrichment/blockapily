@@ -257,19 +257,27 @@ class BlocklyGenerator:
 
     @staticmethod
     def update_toolbox(category_xml: str, toolbox_path: Path):
-        if not toolbox_path.exists(): return
-        tree = ET.parse(toolbox_path)
-        root = tree.getroot()
+        if not toolbox_path.exists():
+            root = ET.Element('xml', {'xmlns': BLOCKLY_NS})
+            tree = ET.ElementTree(root)
+        else:
+            tree = ET.parse(toolbox_path)
+            root = tree.getroot()
+
         temp_xml = ET.fromstring(f'<xml xmlns="{BLOCKLY_NS}">{category_xml}</xml>')
         new_cat = temp_xml[0]
         new_name = new_cat.get('name')
+
         to_remove = [cat for cat in root.findall('.//{*}category') if cat.get('name') == new_name]
         for cat in to_remove:
             for parent in root.iter():
                 if cat in parent:
                     parent.remove(cat)
                     break
+
         root.append(new_cat)
         root.tag = "xml"
         BlocklyGenerator._strip_ns_prefix(root)
+
+        toolbox_path.parent.mkdir(parents=True, exist_ok=True)
         tree.write(toolbox_path, encoding='utf-8', xml_declaration=True)
