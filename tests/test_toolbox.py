@@ -1,6 +1,11 @@
 import unittest
 from blockapily import *
 import tempfile
+from pathlib import Path
+
+class Vec3: pass
+CUSTOM_TYPE_MAP = {'Vec3': '3DVector'}
+CUSTOM_SHADOW_MAP = {'Vec3': '<shadow type="vector_3d_zero"></shadow>'}
 
 class MockActions: # Defined here for test context
     @mced_block(label="Move Robot")
@@ -14,7 +19,12 @@ class TestToolboxUpdater(unittest.TestCase):
         """Create a temporary directory and a generator for each test."""
         self.temp_dir = tempfile.TemporaryDirectory()
         self.toolbox_path = Path(self.temp_dir.name) / "toolbox.xml"
-        self.generator = BlocklyGenerator(MockActions, category_colour="210")
+        self.generator = BlocklyGenerator(
+            MockActions,
+            type_map=CUSTOM_TYPE_MAP,
+            shadow_map=CUSTOM_SHADOW_MAP,
+            category_colour="210"
+        )
 
     def tearDown(self):
         """Clean up the temporary directory."""
@@ -26,16 +36,14 @@ class TestToolboxUpdater(unittest.TestCase):
         self.generator.update_toolbox(category_xml, self.toolbox_path)
 
         content = self.toolbox_path.read_text()
-        self.assertIn('<category name="Mock Actions" colour="210">', content)
-        self.assertIn('<block type="mock_actions_move"', content)
-        self.assertIn('<block type="mock_actions_get_position"', content)
+        self.assertIn('<category name="MockActions" colour="210">', content)
+        self.assertIn('<block type="mockactions_move"', content)
+        self.assertIn('<block type="mockactions_get_position"', content)
 
     def test_update_existing_category(self):
         """Tests replacing the contents of an existing category."""
-        # --- FIX APPLIED HERE ---
-        # Add the xmlns attribute to make the test file realistic.
         initial_content = """<toolbox xmlns="https://developers.google.com/blockly/xml">
-  <category name="Mock Actions" colour="120">
+  <category name="MockActions" colour="120">
     <block type="old_deprecated_block"></block>
   </category>
 </toolbox>"""
@@ -45,16 +53,11 @@ class TestToolboxUpdater(unittest.TestCase):
         self.generator.update_toolbox(category_xml, self.toolbox_path)
 
         content = self.toolbox_path.read_text()
-        self.assertIn('<category name="Mock Actions" colour="210">', content)
-        self.assertIn('<block type="mock_actions_move"', content)
+        self.assertIn('<category name="MockActions" colour="210">', content)
+        self.assertIn('<block type="mockactions_move"', content)
         self.assertNotIn('old_deprecated_block', content)
-        self.assertEqual(content.count('<category name="Mock Actions"'), 1, "Category should not be duplicated")
-
-# def create_suite():
-#     return unittest.makeSuite(TestToolboxUpdater)
+        self.assertEqual(content.count('<category name="MockActions"'), 1, "Category should not be duplicated")
 
 if __name__ == '__main__':
-    # runner = unittest.TextTestRunner()
     print("Running tests for Toolbox XML Updater...")
     unittest.main()
-    # runner.run(create_suite())
