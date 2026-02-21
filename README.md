@@ -20,16 +20,28 @@ Create a Python class and decorate the methods you want to expose in Blockly wit
 # my_robot.py
 from blockapily import mced_block
 
+class Vec3:
+    def __init__(self, x=0.0, y=0.0, z=0.0):
+        try:
+            self.x = float(x)
+            self.y = float(y)
+            self.z = float(z)
+        except (ValueError, TypeError):
+            print(f"Warning: Invalid input for Vec3({x}, {y}, {z}). Defaulting to (0,0,0).")
+            self.x = 0.0
+            self.y = 0.0
+            self.z = 0.0
+
 class RobotActions:
     """Defines actions a robot can perform."""
 
     @mced_block(label="Move Robot")
-    def move(self, speed: float = 1.0, forward: bool = True):
+    def move(self, direction: Vec3, speed: float = 1.0, forward: bool = True):
         """A simple statement block."""
         pass
 
-    @mced_block(label="Get Position", output_type='3DVector')
-    def get_position(self, target_id: int) -> 'Vec3':
+    @mced_block(label="Get Position")
+    def get_position(self, target_id: int) -> Vec3:
         """A block that returns a value."""
         pass
 ```
@@ -42,11 +54,22 @@ Create a script to run the generator. You only need to provide mappings for any 
 # generate_blocks.py
 from pathlib import Path
 from blockapily import BlocklyGenerator
-from my_robot import RobotActions
+from my_robot import RobotActions,Vec3
 
 # 1. Define mappings for any custom types
-CUSTOM_TYPE_MAP = {'Vec3': '3DVector'}
-CUSTOM_SHADOW_MAP = {'Vec3': '<shadow type="vector_3d_zero"></shadow>'}
+CUSTOM_TYPE_MAP = {
+            'str': 'String',
+            'int': 'Number',
+            'float': 'Number',
+            'bool': 'Boolean',
+            'Vec3': '3DVector'
+}
+CUSTOM_SHADOW_MAP = {
+    'int': '<shadow type="math_number"><field name="NUM">0</field></shadow>',
+    'float': '<shadow type="math_number"><field name="NUM">0.0</field></shadow>',
+    'str': '<shadow type="text"><field name="TEXT"></field></shadow>',
+    'bool': '<shadow type="logic_boolean"><field name="BOOL">TRUE</field></shadow>',
+    'Vec3': '<shadow type="vector_3d_zero"></shadow>'}
 
 # 2. Instantiate the generator
 generator = BlocklyGenerator(
