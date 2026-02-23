@@ -76,7 +76,8 @@ generator = BlocklyGenerator(
     RobotActions,
     type_map=CUSTOM_TYPE_MAP,
     shadow_map=CUSTOM_SHADOW_MAP,
-    category_colour="210"
+    category_colour="210",
+    category_name="Robot"
 )
 
 # 3. Generate the assets
