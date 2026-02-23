@@ -21,11 +21,12 @@ class BlocklyGenerator:
     Generates Blockly block definitions (JS) and Python generators (JS)
     from Python classes, and manages toolbox XML injection.
     """
-    def __init__(self, cls: Any, type_map: Dict[str, str], shadow_map: Dict[str, str], category_colour: str = "#333"):
+    def __init__(self, cls: Any, type_map: Dict[str, str], shadow_map: Dict[str, str],category_colour: str = "#333", category_name:str = None):
         self.cls = cls
         self.type_map = type_map
         self.shadow_map = shadow_map
         self.category_colour = category_colour
+        self.category_name = category_name if category_name is not None else self.cls.__name__
 
     def _get_output_type(self, func: Callable) -> Optional[str]:
         """Maps Python return type hints to Blockly types using the provided type_map."""
@@ -66,7 +67,7 @@ class BlocklyGenerator:
             generators_py.append(self._generate_python_generator(block_type, name, params))
             xml_blocks.append(self._generate_xml_block(block_type, params, method))
 
-        category_xml = f'<category name="{self.cls.__name__}" colour="{self.category_colour}">\n' + "\n".join(xml_blocks) + "\n</category>"
+        category_xml = f'<category name="{self.category_name}" colour="{self.category_colour}">\n' + "\n".join(xml_blocks) + "\n</category>"
 
         return "\n".join(blocks_js), "\n".join(generators_py), category_xml
 
