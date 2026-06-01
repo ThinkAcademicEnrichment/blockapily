@@ -278,7 +278,7 @@ class BlocklyGenerator:
         return root
 
     @staticmethod
-    def update_toolbox(category_xml: str, toolbox_path: Path):
+    def update_toolbox(category_xml: str, toolbox_path: Path, append_separator:bool = False):
         if not toolbox_path.exists():
             root = ET.Element('xml', {'xmlns': BLOCKLY_NS})
             tree = ET.ElementTree(root)
@@ -298,6 +298,9 @@ class BlocklyGenerator:
                     break
 
         root.append(new_cat)
+        if append_separator:
+            root.append(ET.fromstring('<sep/>'))
+
         root.tag = "xml"
         BlocklyGenerator._strip_ns_prefix(root)
 
