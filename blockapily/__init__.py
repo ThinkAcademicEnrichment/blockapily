@@ -28,6 +28,27 @@ class BlocklyGenerator:
         self.category_colour = category_colour
         self.category_name = category_name if category_name is not None else self.cls.__name__
 
+    def _getmembers_ordered(self,cls, predicate=None):
+        """
+        A drop-in replacement for inspect.getmembers that preserves 
+        the definition order of class members.
+        """
+        results = {}
+        
+        # Walk the Method Resolution Order (MRO)
+        for base in inspect.getmro(cls):
+            # base.__dict__ preserves definition order in modern Python
+            for key, value in base.__dict__.items():
+                # Only add it if we haven't seen it yet (child overrides parent)
+                if key not in results:
+                    results[key] = value
+
+        # Apply the optional predicate filter (e.g., inspect.isroutine)
+        if predicate:
+            return [(k, v) for k, v in results.items() if predicate(v)]
+        
+        return list(results.items())
+
     def _get_output_type(self, func: Callable) -> Optional[str]:
         """Maps Python return type hints to Blockly types using the provided type_map."""
         sig = inspect.signature(func)
@@ -53,7 +74,7 @@ class BlocklyGenerator:
         xml_blocks = []
 
         # Get docstring for the class to use as category name if needed
-        for name, method in inspect.getmembers(self.cls, predicate=inspect.isfunction):
+        for name, method in self._getmembers_ordered(self.cls, predicate=inspect.isfunction):
             if not hasattr(method, "_is_mced_block"):
                 continue
 
@@ -257,7 +278,7 @@ class BlocklyGenerator:
         return root
 
     @staticmethod
-    def update_toolbox(category_xml: str, toolbox_path: Path):
+    def update_toolbox(category_xml: str, toolbox_path: Path, append_separator:bool = False):
         if not toolbox_path.exists():
             root = ET.Element('xml', {'xmlns': BLOCKLY_NS})
             tree = ET.ElementTree(root)
@@ -277,6 +298,9 @@ class BlocklyGenerator:
                     break
 
         root.append(new_cat)
+        if append_separator:
+            root.append(ET.fromstring('<sep/>'))
+
         root.tag = "xml"
         BlocklyGenerator._strip_ns_prefix(root)
 
