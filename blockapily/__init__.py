@@ -1,4 +1,5 @@
 import inspect
+import typing
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Callable
@@ -92,37 +93,64 @@ class BlocklyGenerator:
 
         return "\n".join(blocks_js), "\n".join(generators_py), category_xml
 
-    def _resolve_js_check_type(self, param_type) -> Optional[str]:
-        """Helper to resolve Python type hints into JS array or string strings for .setCheck()"""
-        param_str = str(param_type).strip("'\"")
+    def _resolve_js_check_type(self, annotation):
+        """
+        Translates a Python type hint into a Blockly .setCheck() string argument.
+        Returns a string like "'Number'" or "['Number', 'String']", or None.
+        """
+        if annotation == inspect.Signature.empty:
+            return None
 
-        # Handle Union[TypeA, TypeB] -> "['MappedA', 'MappedB']"
-        if 'Union' in param_str:
-            try:
-                inner = param_str.split('[')[1].split(']')[0]
-                types = []
-                for t in inner.split(','):
-                    t_clean = t.strip().strip("'\"")
-                    if '<class' in t_clean:
-                        t_clean = t_clean.split("'")[1].split('.')[-1]
-                    types.append(t_clean)
-                mapped_types = [self.type_map.get(mt, mt) for mt in types]
-                return "[" + ", ".join(f"'{mt}'" for mt in mapped_types) + "]"
-            except Exception:
-                pass
+        # 1. Check if the annotation is a Union (or Optional)
+        origin = typing.get_origin(annotation)
+        
+        # Note: type(annotation).__name__ == 'UnionType' handles Python 3.10+ (X | Y) syntax
+        if origin is typing.Union or type(annotation).__name__ == 'UnionType':
+            types_list = []
+            
+            for arg in typing.get_args(annotation):
+                # Extract the clean name
+                if isinstance(arg, typing.ForwardRef):
+                    t_clean = arg.__forward_arg__
+                elif hasattr(arg, '__name__'):
+                    t_clean = arg.__name__
+                else:
+                    t_clean = str(arg)
 
-        # Handle single types/classes
-        type_name = getattr(param_type, '__name__', param_str).strip("'\"")
-        if '<class' in type_name:
-            type_name = type_name.split("'")[1].split('.')[-1]
+                # Skip NoneType (Blockly doesn't use this; inputs are just left empty)
+                if t_clean == 'NoneType':
+                    continue
+                    
+                types_list.append(t_clean)
+                
+            # Apply your Blockly type mapping and remove duplicates
+            mapped_types = list(set([self.type_map.get(mt, mt) for mt in types_list]))
+            
+            if not mapped_types:
+                return None
+            elif len(mapped_types) == 1:
+                return f"'{mapped_types[0]}'" # e.g., "'MappedType'"
+            else:
+                return "[" + ", ".join(f"'{mt}'" for mt in mapped_types) + "]" # e.g., "['TypeA', 'TypeB']"
 
-        mapped = self.type_map.get(type_name, type_name)
-        return f"'{mapped}'" if mapped else None
+        # 2. Handle Single Types
+        else:
+            # Extract the clean name
+            if isinstance(annotation, typing.ForwardRef):
+                t_clean = annotation.__forward_arg__
+            elif isinstance(annotation, str):
+                t_clean = annotation # Handle raw string annotations if they slipped through
+            elif hasattr(annotation, '__name__'):
+                t_clean = annotation.__name__
+            else:
+                t_clean = str(annotation)
+                
+            mapped_type = self.type_map.get(t_clean, t_clean)
+            return f"'{mapped_type}'" # e.g., "'MappedType'"
 
     def _generate_js_definition(self, block_type, label, params, output_type, tooltip, method):
         args_js_list = []
         sig = inspect.signature(method)
-
         for param_name, meta in params.items():
             # Only generate inputs for things actually in the method signature
             if param_name not in sig.parameters:
