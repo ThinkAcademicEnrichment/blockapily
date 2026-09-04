@@ -2,7 +2,7 @@ import inspect
 import typing
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple, Callable
+from typing import Union, Dict, Any, List, Optional, Tuple, Callable
 
 # Register the standard Blockly namespace to prevent 'ns0:' prefixing
 BLOCKLY_NS = "https://developers.google.com/blockly/xml"
@@ -57,14 +57,20 @@ class BlocklyGenerator:
         if return_type == inspect.Signature.empty:
             return None
 
-        # Handle string literals and actual type objects
-        type_name = getattr(return_type, '__name__', str(return_type)).strip("'\"")
+        # Handle typing.Union or other typing generics
+        if hasattr(return_type, '__origin__') and return_type.__origin__ is Union:
+            # We take the first type in the Union
+            type_obj = return_type.__args__[0]
+            type_name = getattr(type_obj, '__name__', str(type_obj)).strip("'\"")
+        else:
+            # Handle string literals and actual type objects
+            type_name = getattr(return_type, '__name__', str(return_type)).strip("'\"")
 
-        if 'Union' in type_name:
-            # Simple extraction for Union types if needed
-            try:
-                type_name = type_name.split('[')[1].split(',')[0].strip()
-            except: pass
+            if 'Union' in type_name:
+                # Simple extraction for string-based Union types if needed (e.g. "Union[MCStructure, DigitalSet]")
+                try:
+                    type_name = type_name.split('[')[1].split(',')[0].strip()
+                except: pass
 
         return self.type_map.get(type_name, type_name)
 
