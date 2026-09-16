@@ -282,7 +282,7 @@ class BlocklyGenerator:
     @staticmethod
     def generate_parameterized_block(block_type: str, label: str, input_name: str,
                                    input_type: str, output_type: str, colour: Any,
-                                   template: str, shadow_block: Optional[str] = None) -> Dict[str, str]:
+                                   template: str, shadow_block: Optional[str] = None) -> Dict[str, Any]:
         js_def = f"""
     Blockly.Blocks['{block_type}'] = {{
         init: function() {{
@@ -293,15 +293,29 @@ class BlocklyGenerator:
             this.setColour("{colour}");
         }}
     }};"""
-        safe_template = template.replace('{}', f'${{val}}')
-        py_template = f"`'{safe_template}'`"
+        
+        # Split the template to find the prefix and suffix (e.g. "{}_WOOL" -> prefix="", suffix="_WOOL")
+        prefix, suffix = template.split('{}') if '{}' in template else (template, "")
+        
         py_gen = f"""
     pythonGenerator.forBlock['{block_type}'] = function(block, generator) {{
-        const rawVal = generator.valueToCode(block, '{input_name}', pythonGenerator.ORDER_ATOMIC) || "''";
-        const val = rawVal.replace(/['"]/g, '');
-        return [{py_template}, pythonGenerator.ORDER_ATOMIC];
+        const rawVal = generator.valueToCode(block, '{input_name}', pythonGenerator.ORDER_NONE) || "''";
+        let pyCode;
+        
+        // 1. Check if the incoming code is a simple quoted string (from a standard picker)
+        if (/^'.*'$/.test(rawVal) || /^".*"$/.test(rawVal)) {{
+            const unquoted = rawVal.substring(1, rawVal.length - 1);
+            pyCode = `'{prefix}${{unquoted}}{suffix}'`;
+        }} else {{
+            // 2. It's dynamic code (like random.choice). Output Python string concatenation!
+            pyCode = `'{prefix}' + str(${{rawVal}}) + '{suffix}'`;
+        }}
+        
+        // Wrap in parens to guarantee order safety, return as ATOMIC
+        return [`(${{pyCode}})`, pythonGenerator.ORDER_ATOMIC];
     }};"""
-        xml = f'<block type="{block_type}"><value name="{input_name}"><shadow type="{shadow_block}"></shadow></value></block>'
+        
+        xml = f'<block type="{block_type}"><value name="{input_name}"><shadow type="{shadow_block}"></shadow></value></block>' 
         return {"js": js_def, "py": py_gen, "xml": xml}
 
     @staticmethod
