@@ -79,6 +79,7 @@ class BlocklyGenerator:
         blocks_js = []
         generators_py = []
         xml_blocks = []
+        json_blocks = []
 
         # Get docstring for the class to use as category name if needed
         for name, method in self._getmembers_ordered(self.cls, predicate=inspect.isfunction):
@@ -94,10 +95,18 @@ class BlocklyGenerator:
             blocks_js.append(self._generate_js_definition(block_type, label, params, output_type, tooltip, method))
             generators_py.append(self._generate_python_generator(block_type, name, params))
             xml_blocks.append(self._generate_xml_block(block_type, params, method))
+            json_blocks.append(self._generate_json_block(block_type, params, method))
 
         category_xml = f'<category name="{self.category_name}" colour="{self.category_colour}">\n' + "\n".join(xml_blocks) + "\n</category>"
 
-        return "\n".join(blocks_js), "\n".join(generators_py), category_xml
+        # Build the category as a dictionary
+        category_dict = {
+            "kind": "category",
+            "name": self.category_name,
+            "colour": self.category_colour,
+            "contents": json_blocks
+        }
+        return "\n".join(blocks_js), "\n".join(generators_py), category_xml, category_dict
 
     def _resolve_js_check_type(self, annotation):
         """
@@ -216,15 +225,73 @@ class BlocklyGenerator:
         values_xml = []
         sig = inspect.signature(method)
 
+        # Point to the XML-specific half of your dual-map
+        xml_shadow_map = self.shadow_map.get('xml', {})
+
         for p_name, meta in params.items():
             if not isinstance(meta, dict): continue
 
-            shadow = meta.get('shadow')
+            shadow_override = meta.get('shadow')
             full_shadow = None
 
             # 1. Check for Explicit Override in decorator metadata
-            if shadow:
-                full_shadow = self.shadow_map.get(shadow, shadow)
+            if shadow_override:
+                # Handle the new dual-dict format safely
+                if isinstance(shadow_override, dict):
+                    # .get() returns None if 'xml' is missing, silently skipping it!
+                    full_shadow = shadow_override.get('xml') 
+                # Fallback: if it's a string key, look it up in the XML map
+                elif isinstance(shadow_override, str):
+                    full_shadow = xml_shadow_map.get(shadow_override, shadow_override)
+
+            elif p_name in sig.parameters:
+                param_type = sig.parameters[p_name].annotation
+                if param_type != inspect.Signature.empty:
+
+                    type_name = getattr(param_type, '__name__', str(param_type)).strip("'\"")
+                    if '<class' in type_name:
+                        type_name = type_name.split("'")[1].split('.')[-1]
+
+                    # Handle Union by prioritizing the first type for shadows
+                    if 'Union' in type_name:
+                        try:
+                            inner = type_name.split('[')[1].split(']')[0]
+                            type_name = inner.split(',')[0].strip().strip("'\"")
+                            if '<class' in type_name:
+                                type_name = type_name.split("'")[1].split('.')[-1]
+                        except: pass
+
+                    if type_name in xml_shadow_map:
+                        full_shadow = xml_shadow_map[type_name]
+
+            if full_shadow:
+                values_xml.append(f'<value name="{p_name}">{full_shadow}</value>')
+
+        return f'<block type="{block_type}">{" ".join(values_xml)}</block>'
+
+    def _generate_json_block(self, block_type, params, method):
+        """Generates the JSON configuration for a block, automatically inferring shadows."""
+        inputs_dict = {}
+        sig = inspect.signature(method)
+        
+        # Point to the JSON-specific half of your dual-map
+        json_shadow_map = self.shadow_map.get('json', {})
+
+        for p_name, meta in params.items():
+            if not isinstance(meta, dict): continue
+
+            shadow_override = meta.get('shadow')
+            full_shadow = None
+
+            # 1. Check for Explicit Override in decorator metadata
+            if shadow_override:
+                # Handle the new dual-dict format: {'xml': ..., 'json': ...}
+                if isinstance(shadow_override, dict) and 'json' in shadow_override:
+                    full_shadow = shadow_override['json']
+                # Fallback: if it's a string key, look it up in the JSON map
+                elif isinstance(shadow_override, str):
+                    full_shadow = json_shadow_map.get(shadow_override, shadow_override)
+            
             # 2. Check for Implicit Match via Python type hint
             elif p_name in sig.parameters:
                 param_type = sig.parameters[p_name].annotation
@@ -243,14 +310,26 @@ class BlocklyGenerator:
                                 type_name = type_name.split("'")[1].split('.')[-1]
                         except: pass
 
-                    # Resolve automatically via RegistryBuilder's SHADOW_MAP keys
-                    if type_name in self.shadow_map:
-                        full_shadow = self.shadow_map[type_name]
+                    # Resolve automatically via JSON shadow map
+                    if type_name in json_shadow_map:
+                        full_shadow = json_shadow_map[type_name]
 
+            # 3. Assemble the inputs dictionary
             if full_shadow:
-                values_xml.append(f'<value name="{p_name}">{full_shadow}</value>')
+                inputs_dict[p_name] = {
+                    "shadow": full_shadow
+                }
 
-        return f'<block type="{block_type}">{" ".join(values_xml)}</block>'
+        # 4. Build and return the final block dictionary
+        block_dict = {
+            "kind": "block",
+            "type": block_type
+        }
+        
+        if inputs_dict:
+            block_dict["inputs"] = inputs_dict
+
+        return block_dict
 
     @staticmethod
     def generate_picker(block_type: str, label: str, options: List[Tuple[str, str]],
@@ -354,3 +433,5 @@ class BlocklyGenerator:
 
         toolbox_path.parent.mkdir(parents=True, exist_ok=True)
         tree.write(toolbox_path, encoding='utf-8', xml_declaration=True)
+
+
