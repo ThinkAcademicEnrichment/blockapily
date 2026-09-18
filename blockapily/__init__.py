@@ -333,7 +333,7 @@ class BlocklyGenerator:
 
     @staticmethod
     def generate_picker(block_type: str, label: str, options: List[Tuple[str, str]],
-                      output_type: str, colour: Any, tooltip: str = "") -> Dict[str, str]:
+                        output_type: str, colour: Any, tooltip: str = "") -> Dict[str, Any]:
         formatted_options = ',\n'.join([f'                ["{opt[0]}", "{opt[1]}"]' for opt in options])
         clean_tooltip = tooltip.replace('"', '\\"').replace('\n', ' ')
 
@@ -356,12 +356,20 @@ class BlocklyGenerator:
         return [`'${{block.getFieldValue('VALUE')}}'`, pythonGenerator.ORDER_ATOMIC];
     }};"""
 
-        return {"js": js_def, "py": py_gen, "xml": f'<block type="{block_type}"></block>'}
+        # XML and JSON toolbox representations
+        xml = f'<block type="{block_type}"></block>'
+        json_def = {
+            "kind": "block",
+            "type": block_type
+        }
+
+        return {"js": js_def, "py": py_gen, "xml": xml, "json": json_def}
+
 
     @staticmethod
     def generate_parameterized_block(block_type: str, label: str, input_name: str,
-                                   input_type: str, output_type: str, colour: Any,
-                                   template: str, shadow_block: Optional[str] = None) -> Dict[str, Any]:
+                                     input_type: str, output_type: str, colour: Any,
+                                     template: str, shadow_block: Optional[str] = None) -> Dict[str, Any]:
         js_def = f"""
     Blockly.Blocks['{block_type}'] = {{
         init: function() {{
@@ -395,8 +403,23 @@ class BlocklyGenerator:
     }};"""
         
         xml = f'<block type="{block_type}"><value name="{input_name}"><shadow type="{shadow_block}"></shadow></value></block>' 
-        return {"js": js_def, "py": py_gen, "xml": xml}
+        
+        # Safe JSON construction for parameterized blocks
+        json_def = {
+            "kind": "block",
+            "type": block_type,
+            "inputs": {
+                input_name: {}
+            }
+        }
+        
+        if shadow_block:
+            json_def["inputs"][input_name]["shadow"] = {
+                "type": shadow_block
+            }
 
+        return {"js": js_def, "py": py_gen, "xml": xml, "json": json_def}
+    
     @staticmethod
     def _strip_ns_prefix(root: ET.Element):
         for elem in root.iter():
