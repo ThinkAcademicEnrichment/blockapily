@@ -18,7 +18,7 @@ Create a Python class and decorate the methods you want to expose in Blockly wit
 
 ```python
 # my_robot.py
-from blockapily import mced_block
+from blockapily import mced_block,mced_category
 
 class Vec3:
     def __init__(self, x=0.0, y=0.0, z=0.0):
@@ -32,6 +32,7 @@ class Vec3:
             self.y = 0.0
             self.z = 0.0
 
+@mced_category(name='Robot',colour='#222')
 class RobotActions:
     """Defines actions a robot can perform."""
 
@@ -87,8 +88,6 @@ generator = BlocklyGenerator(
     RobotActions,
     type_map=CUSTOM_TYPE_MAP,
     shadow_map=CUSTOM_SHADOW_MAP,
-    category_colour="210",
-    category_name="Robot"
 )
 
 # 3. Generate the assets

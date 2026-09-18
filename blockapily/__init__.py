@@ -17,17 +17,29 @@ def mced_block(label: str, **kwargs):
         return func
     return decorator
 
+def mced_category(name: str = None, colour: str = "#333"):
+    """Decorator to define toolbox category metadata for a Blockly action class."""
+    def decorator(cls):
+        cls._mced_category_name = name
+        cls._mced_category_colour = colour
+        return cls
+    return decorator
+
 class BlocklyGenerator:
     """
     Generates Blockly block definitions (JS) and Python generators (JS)
-    from Python classes, and manages toolbox XML injection.
+    from Python classes, and manages toolbox XML and JSON injection.
     """
-    def __init__(self, cls: Any, type_map: Dict[str, str], shadow_map: Dict[str, str],category_colour: str = "#333", category_name:str = None):
+    def __init__(self, cls: Any, type_map: Dict[str, str], shadow_map: Dict[str, dict], category_colour: str = None, category_name: str = None):
         self.cls = cls
         self.type_map = type_map
         self.shadow_map = shadow_map
-        self.category_colour = category_colour
-        self.category_name = category_name if category_name is not None else self.cls.__name__
+        
+        # 1. Prefer explicitly passed arguments
+        # 2. Fall back to decorator metadata on the class
+        # 3. Fall back to defaults (class name, "#333")
+        self.category_name = category_name or getattr(cls, '_mced_category_name', cls.__name__)
+        self.category_colour = category_colour or getattr(cls, '_mced_category_colour', "#333")
 
     def _getmembers_ordered(self,cls, predicate=None):
         """

@@ -1,3 +1,4 @@
+from blockapily import mced_category
 import unittest
 from blockapily import *
 
@@ -24,6 +25,7 @@ CUSTOM_SHADOW_MAP = {
     }
 }
 
+@mced_category(name='MockActions',colour='#222')
 class MockActions:
     @mced_block(label="Move Robot", speed={'label': 'Speed'}, forward={'label': 'Forward'})
     def move(self, speed: float = 1.5, forward: bool = True): pass
