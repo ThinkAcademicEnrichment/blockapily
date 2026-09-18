@@ -12,3 +12,5 @@ publish.log
 *.egg-info
 poetry.lock
 
+mk_wheel.sh
+
