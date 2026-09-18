@@ -64,12 +64,23 @@ CUSTOM_TYPE_MAP = {
             'bool': 'Boolean',
             'Vec3': '3DVector'
 }
+
 CUSTOM_SHADOW_MAP = {
-    'int': '<shadow type="math_number"><field name="NUM">0</field></shadow>',
-    'float': '<shadow type="math_number"><field name="NUM">0.0</field></shadow>',
-    'str': '<shadow type="text"><field name="TEXT"></field></shadow>',
-    'bool': '<shadow type="logic_boolean"><field name="BOOL">TRUE</field></shadow>',
-    'Vec3': '<shadow type="vector_3d_zero"></shadow>'}
+    'xml': {
+        'int': '<shadow type="math_number"><field name="NUM">0</field></shadow>',
+        'float': '<shadow type="math_number"><field name="NUM">0.0</field></shadow>',
+        'str': '<shadow type="text"><field name="TEXT"></field></shadow>',
+        'bool': '<shadow type="logic_boolean"><field name="BOOL">TRUE</field></shadow>',
+        'Vec3': '<shadow type="vector_3d_zero"></shadow>'
+    },
+    'json': {
+        'int': {'type': 'math_number', 'fields': {'NUM': 0}},
+        'float': {'type': 'math_number', 'fields': {'NUM': 0.0}},
+        'str': {'type': 'text', 'fields': {'TEXT': ''}},
+        'bool': {'type': 'logic_boolean', 'fields': {'BOOL': 'TRUE'}},
+        'Vec3': {'type': 'vector_3d_zero'}
+    }
+}
 
 # 2. Instantiate the generator
 generator = BlocklyGenerator(
@@ -81,7 +92,7 @@ generator = BlocklyGenerator(
 )
 
 # 3. Generate the assets
-block_defs_js, py_gen_js, toolbox_xml = generator.generate()
+block_defs_js, py_gen_js, toolbox_xml, toolbox_json = generator.generate()
 
 # 4. Save the generated files
 output_dir = Path("./generated_assets")
@@ -93,6 +104,8 @@ output_dir.mkdir(exist_ok=True)
 # 5. Update the main toolbox XML file
 toolbox_path = output_dir / "toolbox.xml"
 generator.update_toolbox(toolbox_xml, toolbox_path)
+toolbox_path_json = output_dir / "toolbox.json"
+generator.update_toolbox_json(toolbox_json, toolbox_path_json)
 
 print(f"✅ Blockly assets generated in '{output_dir}'")
 ```
@@ -111,5 +124,5 @@ This will create a `generated_assets` directory containing your JavaScript files
 
   * **Decorator-based:** Simply mark methods for export with a clear `@mced_block` decorator.
   * **Type Hint Driven:** Automatically infers Blockly types, shadows, and default values from standard Python type annotations.
-  * **Automatic Toolbox Management:** Intelligently creates and updates your `toolbox.xml` file, adding or replacing categories as needed.
+  * **Automatic Toolbox Management:** Intelligently creates and updates your `toolbox.xml` and `toolbox.json` files, adding or replacing categories as needed.
   * **Highly Configurable:** Easily customize block prefixes, category names, colors, and mappings for custom types.
