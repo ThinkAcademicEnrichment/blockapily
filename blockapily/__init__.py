@@ -457,4 +457,35 @@ class BlocklyGenerator:
         toolbox_path.parent.mkdir(parents=True, exist_ok=True)
         tree.write(toolbox_path, encoding='utf-8', xml_declaration=True)
 
+    @staticmethod
+    def update_toolbox_json(category_json: dict, toolbox_path: Path, append_separator: bool = False):
+        import json
+        
+        if not toolbox_path.exists():
+            toolbox_data = {
+                "kind": "categoryToolbox",
+                "contents": []
+            }
+        else:
+            with open(toolbox_path, 'r', encoding='utf-8') as f:
+                toolbox_data = json.load(f)
 
+        new_name = category_json.get('name')
+
+        # Remove existing category with the same name if it exists
+        if 'contents' in toolbox_data:
+            toolbox_data['contents'] = [
+                item for item in toolbox_data['contents']
+                if not (item.get('kind') == 'category' and item.get('name') == new_name)
+            ]
+        else:
+            toolbox_data['contents'] = []
+
+        # Append new category and optional separator
+        toolbox_data['contents'].append(category_json)
+        if append_separator:
+            toolbox_data['contents'].append({"kind": "sep"})
+
+        toolbox_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(toolbox_path, 'w', encoding='utf-8') as f:
+            json.dump(toolbox_data, f, indent=4)
