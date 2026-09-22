@@ -213,6 +213,18 @@ class BlocklyGenerator:
             {output_js}
             this.setColour("{self.category_colour}");
             this.setTooltip("{clean_tooltip}");
+
+            // Self-contained dynamic color handler
+            this.customColour_ = null;
+            this.saveExtraState = function() {{
+                return this.customColour_ ? {{ 'customColour': this.customColour_ }} : null;
+            }};
+            this.loadExtraState = function(state) {{
+                if (state && state['customColour']) {{
+                    this.customColour_ = state['customColour'];
+                    this.setColour(this.customColour_);
+                }}
+            }};
         }}
     }};"""
 
@@ -360,6 +372,18 @@ class BlocklyGenerator:
             this.setOutput(true, "{output_type}");
             this.setColour("{colour}");
             this.setTooltip("{clean_tooltip}");
+
+            // Self-contained dynamic colour handler
+            this.customColour_ = null;
+            this.saveExtraState = function() {{
+                return this.customColour_ ? {{ 'customColour': this.customColour_ }} : null;
+            }};
+            this.loadExtraState = function(state) {{
+                if (state && state['customColour']) {{
+                    this.customColour_ = state['customColour'];
+                    this.setColour(this.customColour_);
+                }}
+            }};
         }}
     }};"""
 
@@ -390,6 +414,18 @@ class BlocklyGenerator:
                 .appendField('{label}');
             this.setOutput(true, '{output_type}');
             this.setColour("{colour}");
+            
+            // Self-contained dynamic color handler
+            this.customColor_ = null;
+            this.saveExtraState = function() {{
+                return this.customColor_ ? {{ 'customColor': this.customColor_ }} : null;
+            }};
+            this.loadExtraState = function(state) {{
+                if (state && state['customColor']) {{
+                    this.customColor_ = state['customColor'];
+                    this.setColour(this.customColor_);
+                }}
+            }};
         }}
     }};"""
         

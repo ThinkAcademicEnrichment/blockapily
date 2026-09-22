@@ -115,7 +115,7 @@ print(f"✅ Blockly assets generated in '{output_dir}'")
 python generate_blocks.py
 ```
 
-This will create a `generated_assets` directory containing your JavaScript files and an updated `toolbox.xml` ready to be used in your Blockly application.
+This will create a `generated_assets` directory containing your JavaScript files and an updated `toolbox.xml` and `toolbox.json` ready to be used in your Blockly application.
 
 -----
 
